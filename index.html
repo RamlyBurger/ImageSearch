@@ -78,6 +78,7 @@
         };
 
         // Crop selection
+        // Mouse events
         canvas.onmousedown = function(e) {
             cropping = true;
             cropStart = getMousePos(e);
@@ -95,6 +96,40 @@
                 drawCropRect();
             }
         };
+
+        // Touch events for mobile
+        canvas.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 1) {
+                cropping = true;
+                cropStart = getTouchPos(e.touches[0]);
+            }
+        });
+        canvas.addEventListener('touchend', function(e) {
+            if (!cropping) return;
+            cropping = false;
+            // Use last touch position or fallback to cropStart
+            if (e.changedTouches.length === 1) {
+                cropEnd = getTouchPos(e.changedTouches[0]);
+            } else {
+                cropEnd = cropStart;
+            }
+            drawCropRect();
+        });
+        canvas.addEventListener('touchmove', function(e) {
+            if (cropping && e.touches.length === 1) {
+                cropEnd = getTouchPos(e.touches[0]);
+                ctx.drawImage(img, 0, 0);
+                drawCropRect();
+            }
+        });
+
+        function getTouchPos(touch) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: Math.round((touch.clientX - rect.left) * (canvas.width / rect.width)),
+                y: Math.round((touch.clientY - rect.top) * (canvas.height / rect.height))
+            };
+        }
 
         function getMousePos(e) {
             const rect = canvas.getBoundingClientRect();
