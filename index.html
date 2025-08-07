@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Operations</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        #canvas { border: 1px solid #ccc; max-width: 100%; }
+        .controls { margin-top: 20px; }
+        .controls button { margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Upload and Edit Image</h2>
+    <input type="file" id="upload" accept="image/*">
+    <br><br>
+    <canvas id="canvas"></canvas>
+    <div class="controls">
+        <button id="cropBtn">Crop</button>
+        <button id="grayBtn">Convert to Grayscale</button>
+        <button id="downloadBtn">Download</button>
+    </div>
+    <p id="instructions">Select an area to crop by dragging on the image.</p>
+    <script>
+        const upload = document.getElementById('upload');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let img = new Image();
+        let cropping = false;
+        let cropStart = null;
+        let cropEnd = null;
+
+        // Paste image from clipboard
+        window.addEventListener('paste', function(e) {
+            if (e.clipboardData) {
+                const items = e.clipboardData.items;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        const blob = items[i].getAsFile();
+                        const reader = new FileReader();
+                        reader.onload = function(evt) {
+                            img.onload = function() {
+                                canvas.width = img.width;
+                                canvas.height = img.height;
+                                ctx.drawImage(img, 0, 0);
+                            };
+                            img.src = evt.target.result;
+                        };
+                        reader.readAsDataURL(blob);
+                        e.preventDefault();
+                        break;
+                    }
+                }
+            }
+        });
+
+        upload.onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                img.onload = function() {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+
+        // Crop selection
+        canvas.onmousedown = function(e) {
+            cropping = true;
+            cropStart = getMousePos(e);
+        };
+        canvas.onmouseup = function(e) {
+            if (!cropping) return;
+            cropping = false;
+            cropEnd = getMousePos(e);
+            drawCropRect();
+        };
+        canvas.onmousemove = function(e) {
+            if (cropping) {
+                cropEnd = getMousePos(e);
+                ctx.drawImage(img, 0, 0);
+                drawCropRect();
+            }
+        };
+
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: Math.round((e.clientX - rect.left) * (canvas.width / rect.width)),
+                y: Math.round((e.clientY - rect.top) * (canvas.height / rect.height))
+            };
+        }
+
+        function drawCropRect() {
+            if (!cropStart || !cropEnd) return;
+            ctx.save();
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6]);
+            ctx.strokeRect(
+                cropStart.x,
+                cropStart.y,
+                cropEnd.x - cropStart.x,
+                cropEnd.y - cropStart.y
+            );
+            ctx.restore();
+        }
+
+        document.getElementById('cropBtn').onclick = function() {
+            if (!cropStart || !cropEnd) return alert('Select an area to crop first!');
+            const x = Math.min(cropStart.x, cropEnd.x);
+            const y = Math.min(cropStart.y, cropEnd.y);
+            const w = Math.abs(cropEnd.x - cropStart.x);
+            const h = Math.abs(cropEnd.y - cropStart.y);
+            const cropped = ctx.getImageData(x, y, w, h);
+            canvas.width = w;
+            canvas.height = h;
+            ctx.putImageData(cropped, 0, 0);
+            cropStart = cropEnd = null;
+        };
+
+        document.getElementById('grayBtn').onclick = function() {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                const avg = (imageData.data[i] + imageData.data[i+1] + imageData.data[i+2]) / 3;
+                imageData.data[i] = imageData.data[i+1] = imageData.data[i+2] = avg;
+            }
+            ctx.putImageData(imageData, 0, 0);
+        };
+
+        document.getElementById('downloadBtn').onclick = function() {
+            const link = document.createElement('a');
+            link.download = 'edited-image.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        };
+    </script>
+</body>
+</html>
